@@ -32,5 +32,27 @@ services:
       timeout: 3s
       retries: 30
 
+  # HTTPS for production: a free Let's Encrypt certificate, renewed automatically, and HTTP -> HTTPS
+  # redirects. Only starts with the "prod" profile (COMPOSE_PROFILES=prod in the server's .env), so
+  # local development is unchanged. On the server, also set APP_PORT=127.0.0.1:8080 so Caddy is the
+  # only public entry point.
+  caddy:
+    image: caddy:2
+    profiles: ["prod"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-}  # required with the prod profile; Caddy refuses to start without it
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # the certificate; keep it to avoid Let's Encrypt rate limits
+      - caddy_config:/config
+    depends_on:
+      - app
+
 volumes:
   dbdata:
+  caddy_data:
+  caddy_config:
