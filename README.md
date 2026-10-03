@@ -3,7 +3,7 @@
 Search a 1,000-product catalog by exact name ("iPhone 16", "שואב אבק") or by describing a need
 ("מתנה למישהו שאוהב לבשל", "משהו שיעזור לנקות שערות של כלב מהספה"), in Hebrew, English, or both.
 
-- **Live site:** http://ec2-52-6-117-226.compute-1.amazonaws.com
+- **Live site:** https://search.signups.me/
 - **Repository:** https://github.com/yaronpen/search_products_app/
 - **Stack:** PHP 8.4 (no framework) · MySQL 8.4 · vanilla HTML/CSS/JS · OpenAI embeddings · Docker
 - **Deep dive:** [docs/search.md](docs/search.md) covers the architecture, the ranking step by step, and every test and bug.
