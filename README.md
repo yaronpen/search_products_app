@@ -60,13 +60,35 @@ keyword-only. Add `?debug` to any API search (`/api/search?q=iphone&debug`) to s
 
 ## Known limitations and next steps
 
+**Search quality**
 - **Descriptive queries are good, not perfect.** For the dog-hair query, a dog bed ranks 2nd and the pet-hair brush
-  6th. Next: have an LLM rewrite descriptive queries into product types before embedding, cached per query.
-- **Alternatives only on request, unlabelled.** Next: a labelled "מוצרים דומים" section under precise searches.
+  6th, because the embedding weighs "dog" heavily. Next: have an LLM rewrite descriptive queries into product
+  types ("handheld vacuum, pet-hair remover") before embedding, cached per query.
+- **Single Hebrew words are noise to the embedding model.** For "מחבת" its top match is a board game; keywords carry
+  these queries. Hebrew handling is light stemming, not a real morphological analyzer. Next: a Hebrew analyzer
+  (e.g. Hspell-based) or a multilingual model fine-tuned on Hebrew product text.
 - **No typo tolerance** beyond word prefixes. Next: trigram or edit-distance matching.
-- **Aliases and filler words are hand-written lists.** Next: learn them from search logs.
-- **No rate limiting.** Each new query costs one OpenAI call. Next: rate limiting at the proxy, plus an OpenAI
-  spending cap as a backstop.
+- **Hand-written lists:** aliases, filler words and "similar" trigger words. "משהו כמו אייפון" isn't recognized as a
+  request for alternatives. Next: learn them from search logs.
+- **Ranking constants are tuned on 23 golden queries,** so they may be overfitted to them. Next: a larger labelled
+  set, and click data to measure real relevance.
+- **Alternatives only on request, unlabelled.** Next: a labelled "מוצרים דומים" section under precise searches.
+
+**Performance and cost**
+- **A query's first search waits for OpenAI** (about 0.5–1.5 s on the live server); repeats take about 45 ms.
+  Search-as-you-type also embeds partial words ("שוא"), each a first-time call. Next: wait for a longer pause
+  before semantic search, and use keywords alone for very short input.
+- **Brute-force scoring in PHP memory** is fine for 1,000 products, not for 100,000. Next: an ANN index (pgvector,
+  OpenSearch or a vector DB).
+- **No rate limiting.** Each new query costs one OpenAI call. Next: rate limiting at the proxy, plus a spending cap.
+- **Depends on OpenAI.** Without it the app falls back to keywords, and descriptive queries stop working.
+
+**Operations and code**
+- **One EC2 instance** runs the app, MySQL and Caddy, so there are no backups, no failover and no monitoring. It's
+  also in a US region, adding about 300 ms per request from Israel. Next: managed MySQL (RDS) with backups,
+  monitoring, and the Tel Aviv region.
+- **Home-grown test runner, no CI.** Tests hit the real DB and API, so they're not hermetic. Next: PHPUnit with a
+  mocked embeddings client, run on every push.
 - **Prices are estimated, images are the CSV's placeholders.** Left out on purpose: filters, sorting, pagination.
 
 ## Working with Claude
@@ -91,10 +113,14 @@ reviewed its output, challenged its proposals, and decided what to keep.
   accepted. All three are fixed and covered by tests.
 
 **Suggestions I changed or rejected:**
-- **The DI container: rejected.** When I asked for an MVC structure, Claude also added a generic DI container and a
-  `Models/` folder holding only an index class. I asked if it was overkill. It agreed the layers were worth keeping
-  but the container wasn't, for eight objects that never change. Wiring is now plain `new` calls in
-  `bootstrap/app.php`.
+- **The backend structure: changed, at my insistence.** Claude's first version was flat: a single `search.php`
+  endpoint, with SQL spread across the catalog loader, the search service and the import script. I asked for a
+  layered structure: routes → controller → services → repositories. Now all SQL lives in repositories, all logic in
+  services, and the controller handles HTTP only. That also made later changes easy to place. For example, the
+  input validation fixes went into the controller without touching the search logic.
+- **The DI container: rejected.** During that restructure Claude also added a generic DI container and a `Models/`
+  folder holding only an index class. I asked whether that was overkill. It agreed the layers were worth keeping but
+  the container wasn't, for eight objects that never change. Wiring is now plain `new` calls in `bootstrap/app.php`.
 - **`Models/`: changed.** I kept the folder but gave it a real `Product` model, which the repository returns and
   the API serializes.
 - **Hardcoded settings: changed.** The OpenAI URL, model, dimensions and timeout were constants. I moved them to `.env`,
